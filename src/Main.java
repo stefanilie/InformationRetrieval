@@ -29,13 +29,7 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 
 public class Main {
 
-    public static void main(String[] args) throws ParseException {
-        Scanner scan = new Scanner(System.in);
-
-        System.out.println("Insert search term: ");
-
-        String searchWord = scan.nextLine();
-
+    public static String parseString(String searchWord) {
         if (searchWord.matches(".*[ăâșțîĂÂȘȚÎ].*")){
             if (searchWord.contains("ă")){
                 searchWord = searchWord.replaceAll("ă", "a");
@@ -62,14 +56,21 @@ public class Main {
                 searchWord = searchWord.replaceAll("Ț", "t");
             }
             if (searchWord.contains("î")){
-               searchWord = searchWord.replaceAll("î", "i");
+                searchWord = searchWord.replaceAll("î", "i");
             }
             if (searchWord.contains("Î")){
-               searchWord = searchWord.replaceAll("Î", "i");
+                searchWord = searchWord.replaceAll("Î", "i");
             }
-            System.out.println("It contains");
-            System.out.println(searchWord);
         }
+        return searchWord;
+    }
+
+    public static void main(String[] args) throws ParseException {
+        Scanner scan = new Scanner(System.in);
+
+        System.out.println("Insert search term: ");
+
+        String searchWord = scan.nextLine();
 
         StandardAnalyzer analyzer = new StandardAnalyzer();
         Directory index = new RAMDirectory();
@@ -80,10 +81,10 @@ public class Main {
 
         IndexWriter w = new IndexWriter(index, config);
 
-        addDoc(w, "Lucene in Action facaturas");
+        addDoc(w, "Lucene in Action Făcâturî");
         addDoc(w, "Lucene for Dummies");
         addDoc(w, "Managing Gigabytes");
-        addDoc(w, "The Art of Computer Science");
+        addDoc(w, "The Art of Computer Șcience");
         w.close();
 
         } catch (IOException e) {
@@ -91,7 +92,7 @@ public class Main {
         }
 
         //Query
-        Query q = new QueryParser("text", analyzer).parse(searchWord);
+        Query q = new QueryParser("parsedString", analyzer).parse(parseString(searchWord));
 
         //Searching
         try {
@@ -110,15 +111,12 @@ public class Main {
         } catch (IOException e) {
             System.out.println("2moloz la tava:\n"+e.getMessage());
         }
-
-
-
     }
 
     private static void addDoc(IndexWriter w, String text) throws IOException {
         Document doc = new Document();
         doc.add(new TextField("text", text, Field.Store.YES));
+        doc.add(new TextField("parsedString", parseString(text), Field.Store.YES));
         w.addDocument(doc);
     }
-
 }

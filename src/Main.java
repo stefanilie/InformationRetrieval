@@ -28,10 +28,48 @@ import org.apache.lucene.queryparser.classic.QueryParser;
 
 
 public class Main {
-    
+
     public static void main(String[] args) throws ParseException {
-        System.out.println("Hi mane, I'm using lucene!");
         Scanner scan = new Scanner(System.in);
+
+        System.out.println("Insert search term: ");
+
+        String searchWord = scan.nextLine();
+
+        if (searchWord.matches(".*[ăâșțîĂÂȘȚÎ].*")){
+            if (searchWord.contains("ă")){
+                searchWord = searchWord.replaceAll("ă", "a");
+            }
+            if (searchWord.contains("Ă")){
+                searchWord = searchWord.replaceAll("Ă", "A");
+            }
+            if (searchWord.contains("â")){
+                searchWord = searchWord.replaceAll("â", "a");
+            }
+            if (searchWord.contains("Â")){
+                searchWord = searchWord.replaceAll("Â", "a");
+            }
+            if (searchWord.contains("ș")){
+                searchWord = searchWord.replaceAll("ș", "s");
+            }
+            if (searchWord.contains("Ș")){
+                searchWord = searchWord.replaceAll("Ș", "s");
+            }
+            if (searchWord.contains("ț")){
+                searchWord = searchWord.replaceAll("ț", "t");
+            }
+            if (searchWord.contains("Ț")){
+                searchWord = searchWord.replaceAll("Ț", "t");
+            }
+            if (searchWord.contains("î")){
+               searchWord = searchWord.replaceAll("î", "i");
+            }
+            if (searchWord.contains("Î")){
+               searchWord = searchWord.replaceAll("Î", "i");
+            }
+            System.out.println("It contains");
+            System.out.println(searchWord);
+        }
 
         StandardAnalyzer analyzer = new StandardAnalyzer();
         Directory index = new RAMDirectory();
@@ -40,22 +78,20 @@ public class Main {
 
         try {
 
-
         IndexWriter w = new IndexWriter(index, config);
 
-        addDoc(w, "Lucene in Action", "193398817");
-        addDoc(w, "Lucene for Dummies", "55320055Z");
-        addDoc(w, "Managing Gigabytes", "55063554A");
-        addDoc(w, "The Art of Computer Science", "9900333X");
+        addDoc(w, "Lucene in Action facaturas");
+        addDoc(w, "Lucene for Dummies");
+        addDoc(w, "Managing Gigabytes");
+        addDoc(w, "The Art of Computer Science");
+        w.close();
 
         } catch (IOException e) {
-            System.out.println("moloz la tava");
+            System.out.println("moloz la tava:\n"+e.getMessage());
         }
 
         //Query
-
-        String querystr = args.length > 0 ? args[0] : "lucene";
-        Query q = new QueryParser("title", analyzer).parse(querystr);
+        Query q = new QueryParser("text", analyzer).parse(searchWord);
 
         //Searching
         try {
@@ -64,16 +100,24 @@ public class Main {
             IndexSearcher searcher = new IndexSearcher(reader);
             TopDocs docs = searcher.search(q, hitsPerPage);
             ScoreDoc[] hits = docs.scoreDocs;
+
+            System.out.println("Found " + hits.length + " hits.");
+            for(int i=0;i<hits.length;++i) {
+                int docId = hits[i].doc;
+                Document d = searcher.doc(docId);
+                System.out.println((i + 1) + ". " + d.get("text"));
+            }
         } catch (IOException e) {
-            System.out.println("moloz la tava");
+            System.out.println("2moloz la tava:\n"+e.getMessage());
         }
+
+
 
     }
 
-    private static void addDoc(IndexWriter w, String title, String isbn) throws IOException {
+    private static void addDoc(IndexWriter w, String text) throws IOException {
         Document doc = new Document();
-        doc.add(new TextField("title", title, Field.Store.YES));
-        doc.add(new StringField("isbn", isbn, Field.Store.YES));
+        doc.add(new TextField("text", text, Field.Store.YES));
         w.addDocument(doc);
     }
 

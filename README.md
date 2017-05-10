@@ -16,6 +16,15 @@ Usage
 
 Just ```git clone``` and open using ItelliJ.
 
+
+Tasks schedule
+--------------
+[X] Add support for diacritics
+[X] Add exclusion of link-words
+[/] Add reading from multiple files types (txt, html, PDF)
+[] Add whole folder loading of known files
+[] Stemming
+
 Notice
 -----
 

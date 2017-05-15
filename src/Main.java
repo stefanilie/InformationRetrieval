@@ -2,15 +2,19 @@
  * Created by stefan.ilie on 5/3/17.
  */
 
+import com.sun.xml.internal.xsom.impl.parser.ParserContext;
 import org.apache.lucene.*;
 
 import java.io.*;
 import java.lang.reflect.Array;
+import java.nio.file.*;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.ro.RomanianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
@@ -26,18 +30,23 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
 import org.apache.lucene.store.Directory;
+import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
 import org.apache.lucene.queryparser.classic.QueryParser;
+import org.apache.tika.exception.TikaException;
+import org.apache.tika.metadata.Metadata;
+import org.apache.tika.parser.AutoDetectParser;
+import org.apache.tika.parser.ParseContext;
+import org.apache.tika.parser.Parser;
+import org.apache.tika.sax.BodyContentHandler;
+import org.xml.sax.ContentHandler;
+import org.xml.sax.SAXException;
 
 import java.io.IOException;
 
 
 
 public class Main {
-
-    private static final String FILENAME = "/Users/stefan.ilie/IdeaProjects/RegasireaInformatiei/ciorba.txt";
-    private static final String FILENAME2 = "/Users/stefan.ilie/IdeaProjects/RegasireaInformatiei/ciorba.html";
-    private static final String FILENAME3 = "/Users/stefan.ilie/IdeaProjects/RegasireaInformatiei/test2.txt";
 
 
     public static String parseString(String searchWord) {
@@ -83,106 +92,99 @@ public class Main {
         return true;
     }
 
+    public static void loadFiles(IndexWriter w, Path filesPath)
+    throws IOException, TikaException, SAXException{
+        if(Files.isDirectory(filesPath)){
+            Files.walkFileTree(filesPath, new SimpleFileVisitor<Path>() {
+               @Override
+                public FileVisitResult visitFile(Path file, BasicFileAttributes attributes) throws IOException {
+                   try {
+                       loadFile(w, file);
+                   } catch (Exception ex){
 
-    public static void loadFile(IndexWriter w){
-
-        ArrayList<String> paths = new ArrayList<String>();
-        paths.add(FILENAME);
-        paths.add(FILENAME2);
-        paths.add(FILENAME3);
-        for (String path : paths) {
-
-            BufferedReader br = null;
-            FileReader fr = null;
-
-            try {
-
-                fr = new FileReader(path);
-                br = new BufferedReader(fr);
-
-                String sCurrentLine;
-
-                br = new BufferedReader(new FileReader(path));
-
-                while ((sCurrentLine = br.readLine()) != null) {
-                    addDoc(w, sCurrentLine, path);
-                }
-
-            } catch (IOException e) {
-
-                e.printStackTrace();
-
-            } finally {
-
-                try {
-
-                    if (br != null)
-                        br.close();
-
-                    if (fr != null)
-                        fr.close();
-
-                } catch (IOException ex) {
-
-                    ex.printStackTrace();
-
-                }
-
-            }
+                   }
+                   return FileVisitResult.CONTINUE;
+               }
+            });
+        } else {
+            loadFile(w, filesPath);
         }
     }
 
-    public static void main(String[] args) throws ParseException {
-        Scanner scan = new Scanner(System.in);
 
-        System.out.println("Insert search term: ");
+    public static void loadFile(IndexWriter w, Path filePath)
+    throws IOException, TikaException, SAXException{
 
-        String searchWord = scan.nextLine();
+            File f = new File(filePath.toString());
 
-        StandardAnalyzer analyzer = new StandardAnalyzer();
-        Directory index = new RAMDirectory();
+            ContentHandler h = new BodyContentHandler();
+            Metadata meta = new Metadata();
+            FileInputStream fs = new FileInputStream(f);
 
-        IndexWriterConfig config = new IndexWriterConfig(analyzer);
+            meta.set(Metadata.RESOURCE_NAME_KEY, f.getCanonicalPath());
 
-        try {
+            Parser p = new AutoDetectParser();
+            ParseContext context = new ParseContext();
+            p.parse(fs, h, meta, context);
 
-        IndexWriter w = new IndexWriter(index, config);
 
-        loadFile(w);
+            addDoc(w, h.toString(), filePath.toString());
+
+    }
+
+    public static void main(String[] args)
+        throws IOException, TikaException, SAXException, ParseException{
+
+            String filesPath = "Data";
+
+            String indexPath = "index";
+
+            final Path filePathDirectory = Paths.get(filesPath);
 //
-//        addDoc(w, "Lucene in Action Făcâturî");
-//        addDoc(w, "Lucene for Dummies");
-//        addDoc(w, "Managing Gigabytes");
-//        addDoc(w, "The Art of Computer Șcience");
-        w.close();
+            Scanner scan = new Scanner(System.in);
 
-        } catch (IOException e) {
-            System.out.println("moloz la tava:\n"+e.getMessage());
-        }
+            System.out.println("Insert search term: ");
+            String searchWord = scan.nextLine();
+//
+//            Directory dir = FSDirectory.open(Paths.get(indexPath));
 
-        if (checkSearchWord(searchWord)){
-            //Query
-            Query q = new QueryParser("parsedString", analyzer).parse(parseString(searchWord));
+            Directory dir = new RAMDirectory();
 
-            //Searching
-            try {
-                int hitsPerPage = 10;
-                IndexReader reader = DirectoryReader.open(index);
-                IndexSearcher searcher = new IndexSearcher(reader);
-                TopDocs docs = searcher.search(q, hitsPerPage);
-                ScoreDoc[] hits = docs.scoreDocs;
+//            Analyzer analyser = new RomanianAnalyzer();
+            Analyzer analyser = new StandardAnalyzer();
+            IndexWriterConfig config = new IndexWriterConfig(analyser);
 
-                System.out.println("\n"+"Found " + hits.length + " hits.");
-                for(int i=0;i<hits.length;++i) {
-                    int docId = hits[i].doc;
-                    Document d = searcher.doc(docId);
-                    System.out.println("\n-------\n"+d.get("path")+"\n" + (i + 1) + ". " +d.get("text"));
+//            config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
+
+            IndexWriter w = new IndexWriter(dir, config);
+
+            loadFiles(w, filePathDirectory);
+
+            w.close();
+
+            if (checkSearchWord(searchWord)){
+                //Query
+                Query q = new QueryParser("parsedString", analyser).parse(parseString(searchWord));
+
+                //Searching
+                try {
+                    int hitsPerPage = 10;
+                    IndexReader reader = DirectoryReader.open(dir);
+                    IndexSearcher searcher = new IndexSearcher(reader);
+                    TopDocs docs = searcher.search(q, hitsPerPage);
+                    ScoreDoc[] hits = docs.scoreDocs;
+
+                    System.out.println("\n"+"Found " + hits.length + " hits.");
+                    for(int i=0;i<hits.length;++i) {
+                        int docId = hits[i].doc;
+                        Document d = searcher.doc(docId);
+                        System.out.println("\n-------\n"+d.get("path")+"\n" + (i + 1) + ". " +d.get("text"));
+                    }
+                } catch (IOException e) {
+                    System.out.println("2moloz la tava:\n"+e.getMessage());
                 }
-            } catch (IOException e) {
-                System.out.println("2moloz la tava:\n"+e.getMessage());
-            }
 
-        }
+            }
     }
 
     private static void addDoc(IndexWriter w, String text, String filePath) throws IOException {

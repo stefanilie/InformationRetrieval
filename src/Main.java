@@ -3,6 +3,7 @@
  */
 
 import com.sun.xml.internal.xsom.impl.parser.ParserContext;
+import org.apache.commons.lang.StringUtils;
 import org.apache.lucene.*;
 
 import java.io.*;
@@ -14,6 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
 import org.apache.lucene.analysis.Analyzer;
+import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.ro.RomanianAnalyzer;
 import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
@@ -29,6 +31,7 @@ import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.ScoreDoc;
 import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.highlight.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
 import org.apache.lucene.store.RAMDirectory;
@@ -47,7 +50,6 @@ import java.io.IOException;
 
 
 public class Main {
-
 
     public static String parseString(String searchWord) {
         if (searchWord.matches(".*[ăâșțîĂÂȘȚÎ].*")){
@@ -133,7 +135,7 @@ public class Main {
     }
 
     public static void main(String[] args)
-        throws IOException, TikaException, SAXException, ParseException{
+        throws IOException, TikaException, SAXException, ParseException, InvalidTokenOffsetsException{
 
             String filesPath = "Data";
 
@@ -151,7 +153,7 @@ public class Main {
             Directory dir = new RAMDirectory();
 
 //            Analyzer analyser = new RomanianAnalyzer();
-            Analyzer analyser = new StandardAnalyzer();
+            Analyzer analyser = new RomanianTokenizer();
             IndexWriterConfig config = new IndexWriterConfig(analyser);
 
 //            config.setOpenMode(IndexWriterConfig.OpenMode.CREATE);
@@ -162,28 +164,37 @@ public class Main {
 
             w.close();
 
-            if (checkSearchWord(searchWord)){
+            if (checkSearchWord(searchWord)) {
                 //Query
                 Query q = new QueryParser("parsedString", analyser).parse(parseString(searchWord));
 
                 //Searching
-                try {
-                    int hitsPerPage = 10;
-                    IndexReader reader = DirectoryReader.open(dir);
-                    IndexSearcher searcher = new IndexSearcher(reader);
-                    TopDocs docs = searcher.search(q, hitsPerPage);
-                    ScoreDoc[] hits = docs.scoreDocs;
+                int hitsPerPage = 10;
+                int fragmentSize = 30;
+                IndexReader reader = DirectoryReader.open(dir);
+                IndexSearcher searcher = new IndexSearcher(reader);
+                QueryScorer scorer = new QueryScorer(q);
+                Formatter f = new SimpleHTMLFormatter();
+                Highlighter h = new Highlighter(f, scorer);
+                Fragmenter fr = new SimpleSpanFragmenter(scorer, fragmentSize);
 
-                    System.out.println("\n"+"Found " + hits.length + " hits.");
-                    for(int i=0;i<hits.length;++i) {
-                        int docId = hits[i].doc;
-                        Document d = searcher.doc(docId);
-                        System.out.println("\n-------\n"+d.get("path")+"\n" + (i + 1) + ". " +d.get("text"));
-                    }
-                } catch (IOException e) {
-                    System.out.println("2moloz la tava:\n"+e.getMessage());
+                TopDocs results = searcher.search(q, hitsPerPage);
+                ScoreDoc[] hits = results.scoreDocs;
+
+                System.out.println("\n" + "Found " + hits.length + " hits.");
+                for (int i = 0; i < hits.length; ++i) {
+                    int docId = hits[i].doc;
+                    Document d = searcher.doc(docId);
+                    String output = d.get("text");
+                    TokenStream ts = TokenSources.getTokenStream("text", output, new RomanianTokenizer());
+                    String[] highlighted = h.getBestFragments(ts, output, 5);
+
+                    List<String> print = Arrays.asList(highlighted);
+
+                    System.out.println("\n-------\n" + d.get("path"));
+                    System.out.println(StringUtils.join(print, "--"));
+                    //                    System.out.println("\n-------\n" + d.get("path") + "\n" + (i + 1) + ". " + d.get("text"));
                 }
-
             }
     }
 

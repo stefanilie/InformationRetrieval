@@ -187,12 +187,12 @@ public class Main {
                     Document d = searcher.doc(docId);
                     String output = d.get("text");
                     TokenStream ts = TokenSources.getTokenStream("text", output, new RomanianTokenizer());
-                    String[] highlighted = h.getBestFragments(ts, output, 5);
+                    String highlighted = h.getBestFragments(ts, output, 3, "...");
 
-                    List<String> print = Arrays.asList(highlighted);
+//                    List<String> print = Arrays.asList(highlighted);
 
                     System.out.println("\n-------\n" + d.get("path"));
-                    System.out.println(StringUtils.join(print, "--"));
+                    System.out.println(highlighted);
                     //                    System.out.println("\n-------\n" + d.get("path") + "\n" + (i + 1) + ". " + d.get("text"));
                 }
             }

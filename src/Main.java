@@ -21,16 +21,12 @@ import org.apache.lucene.analysis.standard.StandardAnalyzer;
 import org.apache.lucene.document.Field;
 import org.apache.lucene.document.StringField;
 import org.apache.lucene.document.TextField;
-import org.apache.lucene.index.IndexReader;
-import org.apache.lucene.index.IndexWriter;
-import org.apache.lucene.index.IndexWriterConfig;
+import org.apache.lucene.index.*;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.document.Document;
-import org.apache.lucene.index.DirectoryReader;
 import org.apache.lucene.queryparser.classic.ParseException;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.ScoreDoc;
-import org.apache.lucene.search.TopDocs;
+import org.apache.lucene.search.*;
 import org.apache.lucene.search.highlight.*;
 import org.apache.lucene.store.Directory;
 import org.apache.lucene.store.FSDirectory;
@@ -147,6 +143,7 @@ public class Main {
 
             System.out.println("Insert search term: ");
             String searchWord = scan.nextLine();
+            String[] searchwords = searchWord.split(" ");
 //
 //            Directory dir = FSDirectory.open(Paths.get(indexPath));
 
@@ -167,18 +164,31 @@ public class Main {
             if (checkSearchWord(searchWord)) {
                 //Query
                 Query q = new QueryParser("parsedString", analyser).parse(parseString(searchWord));
+//                MultiPhraseQuery.Builder multiPhraseQuery = new MultiPhraseQuery.Builder();
+                BooleanQuery.Builder bqb = new BooleanQuery.Builder();
+                for (int i=0; i<searchwords.length; ++i){
+//                    multiPhraseQuery.add(new Term("parsedString", searchwords[i]));
+
+//                    Query qr = new TermQuery(new Term("parsedString", searchwords[i]));
+                    Query qr = new QueryParser("parsedString", analyser).parse(parseString(searchwords[i]));
+                    bqb.add(qr, BooleanClause.Occur.MUST);
+                }
+
+//                MultiPhraseQuery mpq = multiPhraseQuery.build();
+                BooleanQuery bq = bqb.build();
 
                 //Searching
                 int hitsPerPage = 10;
                 int fragmentSize = 30;
                 IndexReader reader = DirectoryReader.open(dir);
                 IndexSearcher searcher = new IndexSearcher(reader);
-                QueryScorer scorer = new QueryScorer(q);
+
+                QueryScorer scorer = new QueryScorer(bq);
                 Formatter f = new SimpleHTMLFormatter();
                 Highlighter h = new Highlighter(f, scorer);
                 Fragmenter fr = new SimpleSpanFragmenter(scorer, fragmentSize);
 
-                TopDocs results = searcher.search(q, hitsPerPage);
+                TopDocs results = searcher.search(bq, 10);
                 ScoreDoc[] hits = results.scoreDocs;
 
                 System.out.println("\n" + "Found " + hits.length + " hits.");
@@ -187,7 +197,7 @@ public class Main {
                     Document d = searcher.doc(docId);
                     String output = d.get("text");
                     TokenStream ts = TokenSources.getTokenStream("text", output, new RomanianTokenizer());
-                    String highlighted = h.getBestFragments(ts, output, 3, "...");
+                    String highlighted = h.getBestFragments(ts, output, 2, "...");
 
 //                    List<String> print = Arrays.asList(highlighted);
 

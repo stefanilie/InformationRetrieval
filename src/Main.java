@@ -40,6 +40,7 @@ import org.apache.tika.parser.Parser;
 import org.apache.tika.sax.BodyContentHandler;
 import org.xml.sax.ContentHandler;
 import org.xml.sax.SAXException;
+import java.lang.Math;
 
 import java.io.IOException;
 
@@ -130,6 +131,10 @@ public class Main {
 
     }
 
+    public static float IDF(int docFreq, int numDocs){
+        return (float)(Math.log(numDocs/ (double) (docFreq+1))+1.0);
+    }
+
     public static void main(String[] args)
         throws IOException, TikaException, SAXException, ParseException, InvalidTokenOffsetsException{
 
@@ -188,8 +193,19 @@ public class Main {
                 Highlighter h = new Highlighter(f, scorer);
                 Fragmenter fr = new SimpleSpanFragmenter(scorer, fragmentSize);
 
-                TopDocs results = searcher.search(bq, 10);
+                TopDocs results = searcher.search(bq, 2);
                 ScoreDoc[] hits = results.scoreDocs;
+                IndexReaderContext irc = searcher.getTopReaderContext();
+                List<Float> idfList = new ArrayList<Float>();
+                for (int i=0; i<searchwords.length; ++i) {ma
+
+                    TermContext tc = TermContext.build(irc, new Term("parsedString", searchwords[i]));
+                    TermStatistics stats = searcher.termStatistics(new Term("parsedString", searchwords[i]), tc);
+                    int docNumber = reader.maxDoc();
+
+                    float idf = IDF((int)stats.docFreq(), docNumber);
+                    idfList.add(idf);
+                }
 
                 System.out.println("\n" + "Found " + hits.length + " hits.");
                 for (int i = 0; i < hits.length; ++i) {
@@ -197,7 +213,7 @@ public class Main {
                     Document d = searcher.doc(docId);
                     String output = d.get("text");
                     TokenStream ts = TokenSources.getTokenStream("text", output, new RomanianTokenizer());
-                    String highlighted = h.getBestFragments(ts, output, 2, "...");
+                    String highlighted = h.getBestFragments(ts, output, 3, "...");
 
 //                    List<String> print = Arrays.asList(highlighted);
 
@@ -205,7 +221,16 @@ public class Main {
                     System.out.println(highlighted);
                     //                    System.out.println("\n-------\n" + d.get("path") + "\n" + (i + 1) + ". " + d.get("text"));
                 }
+//
+                System.out.println("IDF: ");
+                for (Float ceva: idfList){
+                    System.out.println(ceva);
+                }
             }
+    }
+
+    public static float TF(float freq){
+        return (float) Math.sqrt((double)freq);
     }
 
     private static void addDoc(IndexWriter w, String text, String filePath) throws IOException {
